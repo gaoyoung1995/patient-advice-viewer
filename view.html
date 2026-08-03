@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>个性化注意事项</title>
+<style>
+  :root{
+    --brand:#2f7d6e; --ink:#222; --line:#e6e6e6; --muted:#777; --warn:#c0392b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#f4f6f5;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  .page{max-width:640px;margin:0 auto;background:#fff;min-height:100vh;padding:22px 20px 40px}
+  .head{border-bottom:2px solid var(--brand);padding-bottom:12px;margin-bottom:14px}
+  .clinic{color:var(--brand);font-weight:700;font-size:15px;letter-spacing:.5px}
+  .title{font-size:22px;font-weight:800;margin-top:4px}
+  .meta{display:flex;gap:18px;flex-wrap:wrap;color:#444;font-size:14px;margin:10px 0 4px}
+  .meta b{color:var(--ink)}
+  .sec{margin-top:18px}
+  .sec h3{font-size:16px;margin:0 0 8px;color:var(--brand);
+    border-left:4px solid var(--brand);padding-left:8px}
+  .item{display:flex;gap:8px;padding:7px 0;border-bottom:1px dashed #eee;font-size:15px}
+  .item .box{flex:0 0 auto;width:18px;height:18px;border:1.5px solid var(--brand);border-radius:4px;
+    margin-top:3px;position:relative}
+  .follow{background:#eafaf4;border:1px solid #bfe9da;border-radius:10px;padding:12px 14px;
+    color:#1f5c4f;font-size:15px;font-weight:600}
+  .foot{margin-top:26px;padding-top:12px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .disc{text-align:center;color:var(--warn);font-size:12px;margin-top:18px}
+  .topbar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);
+    padding:8px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)}
+  .topbar button{border:1px solid var(--brand);color:var(--brand);background:#fff;
+    border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer}
+  .err{padding:40px 20px;text-align:center;color:var(--warn)}
+  @media print{
+    body{background:#fff}
+    .topbar{display:none}
+    .page{max-width:none;padding:0}
+  }
+</style>
+</head>
+<body>
+  <div class="topbar no-print">
+    <span>本页由医生端生成，仅供您本人查阅</span>
+    <button onclick="window.print()">打印 / 存为PDF</button>
+  </div>
+  <div class="page" id="page">
+    <div class="err" id="err" style="display:none">页面内容无法识别，请重新扫描或联系医生。</div>
+    <div id="content"></div>
+  </div>
+
+<script>
+/* ---------- base64(url-safe) + UTF-8 解码 ---------- */
+function b64urlDecode(s){
+  s = s.replace(/-/g,'+').replace(/_/g,'/');
+  while(s.length % 4) s += '=';
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+function esc(s){
+  return (s==null?'':String(s))
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function render(){
+  const params = new URLSearchParams(location.search);
+  const d = params.get('d');
+  const box = document.getElementById('content');
+  const errEl = document.getElementById('err');
+  if(!d){ errEl.style.display='block'; return; }
+  let p;
+  try{
+    p = JSON.parse(b64urlDecode(d));
+  }catch(e){ errEl.style.display='block'; return; }
+
+  let html = '';
+  html += '<div class="head"><div class="clinic">'+esc(p.clinic||'个性化注意事项')+'</div>'+
+          '<div class="title">治疗后个性化注意事项</div></div>';
+  html += '<div class="meta"><span>患者：<b>'+esc(p.patient||'')+'</b></span>'+
+          '<span>就诊日期：'+esc(p.date||'')+'</span></div>';
+
+  (p.groups||[]).forEach(g=>{
+    if(!g.items || !g.items.length) return;
+    html += '<div class="sec"><h3>'+esc(g.cat)+'</h3>';
+    g.items.forEach(t=>{
+      html += '<div class="item"><span class="box"></span><span>'+esc(t)+'</span></div>';
+    });
+    html += '</div>';
+  });
+
+  if(p.followUp){
+    html += '<div class="sec"><h3>下次复诊</h3><div class="follow">'+esc(p.followUp)+'</div></div>';
+  }
+
+  html += '<div class="foot">';
+  if(p.doctor) html += '<span>主管医生：'+esc(p.doctor)+'</span>';
+  if(p.footer) html += '<span>'+esc(p.footer)+'</span>';
+  if(p.generated) html += '<span>生成时间：'+esc(p.generated)+'</span>';
+  html += '</div>';
+  html += '<div class="disc">本注意事项为辅助工具，具体请以主治医师医嘱为准</div>';
+
+  box.innerHTML = html;
+  document.title = (p.clinic||'个性化注意事项') + ' · ' + (p.patient||'');
+}
+render();
+</script>
+</body>
+</html>

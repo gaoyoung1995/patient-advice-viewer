@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个性化注意事项生成器</title>
+<script src="vendor/qrcode.min.js"></script>
+<script src="vendor/html2canvas.min.js"></script>
+<style>
+  :root{
+    --primary:#0e7c86; --primary-dark:#0a5b63; --primary-soft:#e6f3f4;
+    --bg:#f4f7f8; --panel:#ffffff; --line:#dfe7e9; --text:#1f2d2f;
+    --muted:#6b7c7e; --warn:#c0392b; --ok:#1e8e5a; --shadow:0 2px 10px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+    background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+  header{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;
+    padding:16px 22px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  header h1{font-size:18px;margin:0;font-weight:600;letter-spacing:.5px}
+  header .sub{font-size:12px;opacity:.85}
+  .tabs{display:flex;gap:6px;background:var(--panel);padding:8px 14px;box-shadow:var(--shadow)}
+  .tabs button{border:none;background:transparent;color:var(--muted);padding:8px 16px;border-radius:8px;
+    cursor:pointer;font-size:14px;font-weight:500}
+  .tabs button.active{background:var(--primary-soft);color:var(--primary-dark)}
+  .wrap{max-width:1180px;margin:18px auto;padding:0 16px}
+  .view{display:none} .view.active{display:block}
+  .grid{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:start}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;
+    box-shadow:var(--shadow)}
+  .panel h2{font-size:15px;margin:0 0 12px;color:var(--primary-dark);border-bottom:2px solid var(--primary-soft);
+    padding-bottom:8px}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px;font-weight:500}
+  input[type=text],input[type=date],input[type=time],textarea,select{width:100%;padding:9px 10px;border:1px solid var(--line);
+    border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--text)}
+  textarea{resize:vertical;min-height:60px}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+  .treatment-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;
+    border:1px solid var(--line);border-radius:8px;padding:8px}
+  .treatment-list label{display:flex;align-items:center;gap:8px;margin:0;color:var(--text);cursor:pointer}
+  .treatment-list input{width:auto}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{border:none;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-weight:600;
+    background:var(--primary);color:#fff;transition:.15s}
+  .btn:hover{background:var(--primary-dark)}
+  .btn.ghost{background:var(--primary-soft);color:var(--primary-dark)}
+  .btn.ghost:hover{background:#d4e9eb}
+  .btn.warn{background:#fbeae8;color:var(--warn)}
+  .btn.sm{padding:6px 10px;font-size:13px}
+  .btn.block{width:100%}
+  .mt{margin-top:14px}
+  .add-row{display:flex;gap:8px}
+  .add-row input{flex:1}
+  .count{font-size:12px;color:var(--muted);margin-top:6px}
+  /* preview card */
+  #previewCard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:26px 30px;
+    box-shadow:var(--shadow);min-height:400px}
+  .pc-head{text-align:center;border-bottom:2px solid var(--primary);padding-bottom:12px;margin-bottom:14px}
+  .pc-head .clinic{font-size:20px;font-weight:700;color:var(--primary-dark)}
+  .pc-head .title{font-size:15px;color:var(--muted);margin-top:2px}
+  .pc-meta{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:14px;
+    border-bottom:1px dashed var(--line);padding-bottom:10px;flex-wrap:wrap;gap:6px}
+  .pc-section{margin:14px 0}
+  .pc-section h3{font-size:15px;margin:0 0 8px;color:var(--primary-dark);
+    display:flex;align-items:center;gap:8px}
+  .pc-section h3::before{content:"";width:4px;height:16px;background:var(--primary);border-radius:2px;display:inline-block}
+  .pc-item{display:flex;gap:8px;padding:5px 0;align-items:flex-start}
+  .pc-item .box{flex:0 0 16px;width:16px;height:16px;border:2px solid var(--primary);border-radius:4px;margin-top:3px}
+  .pc-item .box.on{background:var(--primary)}
+  .pc-item .box.off{background:#fff}
+  .pc-item .txt{flex:1}
+  .pc-del{flex:0 0 auto;border:none;background:#fbeae8;color:var(--warn);border-radius:6px;cursor:pointer;
+    font-size:12px;padding:2px 7px}
+  .pc-chk{flex:0 0 auto;font-size:18px;line-height:1.4;cursor:pointer;user-select:none;color:var(--primary-dark);
+    margin-right:2px;width:18px;text-align:center}
+  .pc-restore{flex:0 0 auto;border:1px solid var(--primary);background:#fff;color:var(--primary-dark);border-radius:6px;cursor:pointer;
+    font-size:12px;padding:2px 9px}
+  .pc-item.removed .txt{color:#9aa6a8;text-decoration:line-through}
+  .pc-followup{background:var(--primary-soft);border-left:4px solid var(--primary);border-radius:8px;
+    padding:12px 14px;color:var(--text)}
+  .pc-followup b{color:var(--primary-dark)}
+  .pc-foot{margin-top:18px;border-top:1px dashed var(--line);padding-top:10px;font-size:12px;color:var(--muted);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .qr-area{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:16px}
+  #qrcode{padding:8px;background:#fff;border:1px solid var(--line);border-radius:8px}
+  .qr-tip{font-size:12px;color:var(--muted)}
+  .export-bar{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .hint{background:#fff8e6;border:1px solid #f3d98b;color:#8a6d1b;border-radius:8px;padding:10px 12px;
+    font-size:13px;margin-top:14px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ok);color:#fff;
+    padding:12px 22px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);opacity:0;transition:.3s;z-index:99;font-weight:600}
+  .toast.show{opacity:1}
+  /* library manager */
+  .lib-block{margin-bottom:22px}
+  .lib-table{width:100%;border-collapse:collapse;margin-top:8px}
+  .lib-table th,.lib-table td{border:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top;font-size:13px}
+  .lib-table th{background:var(--primary-soft);color:var(--primary-dark)}
+  .lib-table input[type=text]{padding:6px 8px}
+  .chk-cell{display:flex;flex-wrap:wrap;gap:6px}
+  .chk-cell label{display:inline-flex;align-items:center;gap:4px;margin:0;font-size:12px;color:var(--text);font-weight:400}
+  .empty{color:var(--muted);font-size:13px;padding:10px 0}
+  .disc{font-size:12px;color:var(--muted);margin-top:10px}
+  @media print{
+    body{background:#fff}
+    header,.tabs,.wrap > .panel,.export-bar,.hint,#formPanel,#tabBar,.toast{display:none!important}
+    .wrap{max-width:none;margin:0;padding:0}
+    #previewCard{box-shadow:none;border:none;border-radius:0;padding:0}
+    #previewCard .no-export{display:none!important}
+    #previewCard .pc-item[data-checked="0"]{display:none!important}
+    #qrArea{display:flex!important}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>个性化注意事项生成器</h1>
+    <div class="sub">治疗项目 → 自动组合 → 个性化叮嘱 → 扫码 / 打印</div>
+  </div>
+  <div class="sub" id="hdrClinic"></div>
+</header>
+
+<div class="tabs no-print" id="tabBar">
+  <button data-tab="gen" class="active">生成注意事项</button>
+  <button data-tab="lib">注意事项库管理</button>
+  <button data-tab="set">设置</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ 生成视图 ============ -->
+  <div class="view active" id="view-gen">
+    <div class="grid">
+      <!-- 表单面板 -->
+      <div class="panel no-print" id="formPanel">
+        <h2>① 录入患者与治疗</h2>
+        <label>患者姓名 *</label>
+        <input type="text" id="patientName" placeholder="请输入患者姓名">
+
+        <label>就诊日期</label>
+        <input type="date" id="visitDate">
+
+        <label>选择治疗项目（可多选，自动匹配注意事项）</label>
+        <div class="treatment-list" id="treatmentList"></div>
+        <div class="count" id="treatmentCount"></div>
+
+        <h2 class="mt">② 补充特殊注意事项</h2>
+        <div class="add-row">
+          <input type="text" id="customInput" placeholder="输入一条特殊叮嘱，回车或点击添加">
+          <button class="btn sm" id="addCustomBtn">添加</button>
+        </div>
+        <div class="count" id="customCount"></div>
+
+        <h2 class="mt">③ 下次复诊</h2>
+        <label>复诊内容（如：抽血查HCG / 阴道B超）</label>
+        <input type="text" id="fuContent" placeholder="例如：返院抽血确认妊娠">
+        <div class="row2">
+          <div><label>复诊日期</label><input type="date" id="fuDate"></div>
+          <div><label>复诊时间</label><input type="time" id="fuTime"></div>
+        </div>
+
+        <button class="btn block mt" id="submitBtn">提交注意事项（生成最终版）</button>
+        <div class="hint" id="genHint">填写患者姓名并选择治疗项目后，右侧会自动组合注意事项；可勾选/删除，也可补充特殊条目。完成后点击上方按钮生成最终版。</div>
+      </div>
+
+      <!-- 预览卡片 -->
+      <div>
+        <div id="previewCard"><!-- 动态渲染 --></div>
+        <div class="qr-area" id="qrArea" style="display:none">
+          <div id="qrcode"></div>
+          <div class="qr-tip" id="qrTip">患者扫码即可查看本页注意事项</div>
+        </div>
+        <div class="export-bar no-print" id="exportBar" style="display:none">
+          <button class="btn" id="printBtn">打印 / 另存为PDF</button>
+          <button class="btn ghost" id="wordBtn">导出 Word</button>
+          <button class="btn ghost" id="imgBtn">保存为图片</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 库管理视图 ============ -->
+  <div class="view" id="view-lib">
+    <div class="panel">
+      <h2>治疗项目管理</h2>
+      <div class="add-row">
+        <input type="text" id="newTreatment" placeholder="新增治疗项目，如：促排卵监测">
+        <button class="btn sm" id="addTreatmentBtn">添加项目</button>
+      </div>
+      <div id="treatmentManage" class="mt"></div>
+
+      <h2 class="mt">注意事项条目库</h2>
+      <div class="disc">每条注意事项可关联多个治疗项目；患者选择对应项目时会自动带出。分类用于打印时分组。</div>
+      <div class="add-row mt">
+        <input type="text" id="newPrecText" placeholder="新增注意事项内容">
+        <input type="text" id="newPrecCat" placeholder="分类(如:用药指导)" style="max-width:160px">
+        <button class="btn sm" id="addPrecBtn">添加条目</button>
+      </div>
+      <div id="precManage" class="mt"></div>
+    </div>
+  </div>
+
+  <!-- ============ 设置视图 ============ -->
+  <div class="view" id="view-set">
+    <div class="panel" style="max-width:560px">
+      <h2>基本信息设置</h2>
+      <label>诊所 / 科室名称（显示在注意事项抬头）</label>
+      <input type="text" id="setClinic" placeholder="例如：XX生殖医学中心">
+      <label>医生姓名 / 落款</label>
+      <input type="text" id="setDoctor" placeholder="例如：主治医师 张医生">
+      <label>页脚提示语（可选）</label>
+      <input type="text" id="setFooter" placeholder="例如：请妥善保管，按时复诊">
+      <label>患者查看页地址（让二维码变成「扫码打开网页」，选填）</label>
+      <input type="text" id="setViewUrl" placeholder="例如：https://你的域名/view.html">
+      <div class="disc">填了这项后，二维码里只放一个网页链接，患者用微信/浏览器扫码会<b>直接打开排版好的注意事项页</b>（微信体验最好）。注意：二维码容量有限（约 500 汉字），内容很长时会自动回退为纯文本模式。把本目录下的 <code>view.html</code> 部署到任意静态空间后，把它的网址填这里即可。需要我帮你一键部署吗？</div>
+      <button class="btn mt" id="saveSetBtn">保存设置</button>
+      <div class="disc">所有数据仅保存在本机浏览器中（localStorage），不会上传任何服务器。建议定期导出备份（后续版本支持）。</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== 数据层 ===================== */
+const STORE_KEY = "ga_data_v1";
+const CATEGORY_ORDER = ["用药指导","生活与活动","饮食注意","观察与复诊","特殊注意事项","其他"];
+let _memStore = null;          // file:// 下 localStorage 不可用时的内存回退
+let _storageOK = true;
+
+function uid(){ return "id_" + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4); }
+
+function _safeGet(){
+  try{ const v = localStorage.getItem(STORE_KEY); if(v!==null) return v; }catch(e){ _storageOK=false; }
+  return _memStore;
+}
+function _safeSet(v){
+  try{ localStorage.setItem(STORE_KEY, v); }catch(e){ _storageOK=false; _memStore=v; }
+}
+
+function seedData(){
+  const t = {
+    fu: uid(), iui: uid(), pick: uid(), trans: uid(), lute: uid(), hys: uid(), hsg: uid()
+  };
+  return {
+    settings:{ clinicName:"", doctorName:"", footer:"", viewBaseUrl:"" },
+    treatments:[
+      {id:t.fu,   name:"促排卵监测"},
+      {id:t.iui,  name:"人工授精(IUI)"},
+      {id:t.pick, name:"取卵手术"},
+      {id:t.trans,name:"胚胎移植"},
+      {id:t.lute, name:"黄体支持"},
+      {id:t.hys,  name:"宫腔镜检查"},
+      {id:t.hsg,  name:"输卵管造影"}
+    ],
+    precautions:[
+      {id:uid(),text:"遵医嘱按时注射促排卵药物，不可自行增减或停药。",category:"用药指导",treatmentIds:[t.fu]},
+      {id:uid(),text:"记录月经周期及每日用药时间，便于复诊时核对。",category:"用药指导",treatmentIds:[t.fu]},
+      {id:uid(),text:"避免剧烈运动与腹部受压，警惕卵巢扭转。",category:"生活与活动",treatmentIds:[t.fu]},
+      {id:uid(),text:"如出现腹胀、腹痛、恶心、尿少、呼吸困难等卵巢过度刺激症状，请及时就诊。",category:"观察与复诊",treatmentIds:[t.fu]},
+
+      {id:uid(),text:"术后按医嘱使用黄体支持药物。",category:"用药指导",treatmentIds:[t.iui]},
+      {id:uid(),text:"术后平卧休息约30分钟，避免剧烈运动。",category:"生活与活动",treatmentIds:[t.iui]},
+      {id:uid(),text:"术后14天返院抽血查HCG确认是否妊娠，请勿提前用试纸自行检测。",category:"观察与复诊",treatmentIds:[t.iui]},
+
+      {id:uid(),text:"术后遵医嘱使用抗生素及黄体支持药物。",category:"用药指导",treatmentIds:[t.pick]},
+      {id:uid(),text:"24小时内避免驾车、高空作业；可淋浴，避免盆浴。",category:"生活与活动",treatmentIds:[t.pick]},
+      {id:uid(),text:"高蛋白饮食、多饮水，有助于预防腹胀。",category:"饮食注意",treatmentIds:[t.pick]},
+      {id:uid(),text:"如腹痛剧烈、阴道出血多于月经量或发热，请立即急诊。",category:"观察与复诊",treatmentIds:[t.pick]},
+
+      {id:uid(),text:"移植后保持正常起居，避免绝对卧床，可适当活动。",category:"生活与活动",treatmentIds:[t.trans]},
+      {id:uid(),text:"移植后14天验孕，避免提前用试纸影响情绪。",category:"观察与复诊",treatmentIds:[t.trans]},
+
+      {id:uid(),text:"阴道用药注意手卫生，药物残渣无需过度清理。",category:"用药指导",treatmentIds:[t.lute]},
+
+      {id:uid(),text:"两周内禁性生活、盆浴及游泳。",category:"生活与活动",treatmentIds:[t.hys]},
+      {id:uid(),text:"少量阴道出血属正常，如出血量多于月经量请及时就诊。",category:"观察与复诊",treatmentIds:[t.hys]},
+
+      {id:uid(),text:"两周内禁性生活，当月需避孕。",category:"生活与活动",treatmentIds:[t.hsg]},
+      {id:uid(),text:"若有碘过敏史请务必提前告知医生。",category:"观察与复诊",treatmentIds:[t.hsg]}
+    ]
+  };
+}
+
+let DATA = loadData();
+function loadData(){
+  const raw = _safeGet();
+  if(raw){ try{ const d = JSON.parse(raw); if(d && d.treatments) return d; }catch(e){} }
+  return seedData();
+}
+function saveData(){ _safeSet(JSON.stringify(DATA)); }
+
+/* ===================== 状态 ===================== */
+const state = {
+  selectedTreatmentIds: [],
+  checkedMap: {},          // precautionId -> bool
+  deletedAutoIds: new Set(),
+  customItems: [],         // {id,text,checked}
+  removedCustom: [],       // 被删除但可恢复的特殊注意事项
+  followUp: {content:"", date:"", time:""},
+  submitted: false,
+  qrDataUrl: ""
+};
+
+/* ===================== 工具 ===================== */
+function $(id){ return document.getElementById(id); }
+function toast(msg){
+  const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2200);
+}
+function todayStr(){
+  const d=new Date(); const p=n=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+}
+function escapeHtml(s){ return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ===================== 标签切换 ===================== */
+document.querySelectorAll(".tabs button").forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    $("view-"+b.dataset.tab).classList.add("active");
+    if(b.dataset.tab==="lib") renderLib();
+    if(b.dataset.tab==="set") renderSettings();
+  };
+});
+
+/* ===================== 生成视图：表单 ===================== */
+function renderTreatmentSelector(){
+  const box=$("treatmentList"); box.innerHTML="";
+  if(DATA.treatments.length===0){ box.innerHTML='<div class="empty">暂无治疗项目，请到“注意事项库管理”添加。</div>'; }
+  DATA.treatments.forEach(t=>{
+    const lab=document.createElement("label");
+    const cb=document.createElement("input");
+    cb.type="checkbox"; cb.value=t.id; cb.checked=state.selectedTreatmentIds.includes(t.id);
+    cb.onchange=()=>{
+      if(cb.checked){ if(!state.selectedTreatmentIds.includes(t.id)) state.selectedTreatmentIds.push(t.id); }
+      else { state.selectedTreatmentIds = state.selectedTreatmentIds.filter(x=>x!==t.id); }
+      renderPreview();
+    };
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(" "+t.name));
+    box.appendChild(lab);
+  });
+  $("treatmentCount").textContent = "已选 "+state.selectedTreatmentIds.length+" 项";
+}
+
+function addCustom(){
+  const inp=$("customInput"); const v=inp.value.trim();
+  if(!v){ toast("请输入特殊注意事项内容"); return; }
+  state.customItems.push({id:uid(),text:v,checked:true});
+  inp.value=""; renderPreview();
+}
+$("addCustomBtn").onclick=addCustom;
+$("customInput").addEventListener("keydown",e=>{ if(e.key==="Enter") addCustom(); });
+
+$("patientName").addEventListener("input", renderPreview);
+$("visitDate").addEventListener("input", renderPreview);
+$("fuContent").addEventListener("input",()=>{ state.followUp.content=$("fuContent").value; renderPreview(); });
+$("fuDate").addEventListener("input",()=>{ state.followUp.date=$("fuDate").value; renderPreview(); });
+$("fuTime").addEventListener("input",()=>{ state.followUp.time=$("fuTime").value; renderPreview(); });
+$("visitDate").value = todayStr();
+
+/* ===================== 生成视图：预览 ===================== */
+function getVisibleAuto(){
+  const sel=new Set(state.selectedTreatmentIds);
+  return DATA.precautions.filter(p=> p.treatmentIds.some(tid=>sel.has(tid)) && !state.deletedAutoIds.has(p.id));
+}
+function getFollowUpText(){
+  const f=state.followUp;
+  if(!f.content && !f.date && !f.time) return "";
+  const when = (f.date||"约定时间") + (f.time? " "+f.time : "");
+  return "请于 "+when+" 进行：" + (f.content||"复诊") + "。";
+}
+
+function buildText(){
+  const name=$("patientName").value.trim()||"（患者姓名）";
+  const date=$("visitDate").value||todayStr();
+  let lines=[];
+  lines.push((DATA.settings.clinicName||"个性化注意事项"));
+  lines.push("患者："+name+"　就诊日期："+date);
+  lines.push("");
+  const auto=getVisibleAuto();
+  const byCat={};
+  auto.forEach(p=>{ if(state.checkedMap[p.id]!==false){ (byCat[p.category]=byCat[p.category]||[]).push(p.text); } });
+  state.customItems.forEach(c=>{ if(c.checked){ (byCat["特殊注意事项"]=byCat["特殊注意事项"]||[]).push(c.text); } });
+  const cats = CATEGORY_ORDER.filter(c=>byCat[c]&&byCat[c].length).concat(Object.keys(byCat).filter(c=>!CATEGORY_ORDER.includes(c)));
+  cats.forEach(cat=>{
+    lines.push("【"+cat+"】");
+    byCat[cat].forEach(t=>lines.push("☐ "+t));
+    lines.push("");
+  });
+  const fu=getFollowUpText();
+  if(fu){ lines.push("【下次复诊】"); lines.push(fu); lines.push(""); }
+  if(DATA.settings.doctorName) lines.push("主管医生："+DATA.settings.doctorName);
+  if(DATA.settings.footer) lines.push(DATA.settings.footer);
+  lines.push("（本注意事项为辅助工具，具体请以主治医师医嘱为准）");
+  return lines.join("\n");
+}
+
+function renderPreview(){
+  const card=$("previewCard");
+  const name=$("patientName").value.trim()||"（患者姓名）";
+  const date=$("visitDate").value||todayStr();
+  let html="";
+  html+='<div class="pc-head"><div class="clinic">'+(escapeHtml(DATA.settings.clinicName)||"个性化注意事项")+'</div>'+
+        '<div class="title">治疗后个性化注意事项</div></div>';
+  html+='<div class="pc-meta"><span>患者：<b>'+escapeHtml(name)+'</b></span><span>就诊日期：'+escapeHtml(date)+'</span></div>';
+
+  const auto=getVisibleAuto();
+  const byCat={};
+  auto.forEach(p=>{
+    const on = state.checkedMap[p.id]!==false;
+    (byCat[p.category]=byCat[p.category]||[]).push({p,on});
+  });
+  state.customItems.forEach(c=>{ (byCat["特殊注意事项"]=byCat["特殊注意事项"]||[]).push({custom:c,on:c.checked}); });
+
+  const cats = CATEGORY_ORDER.filter(c=>byCat[c]&&byCat[c].length).concat(Object.keys(byCat).filter(c=>!CATEGORY_ORDER.includes(c)));
+  if(cats.length===0){
+    html+='<div class="pc-section"><div class="empty">请在左侧选择治疗项目，或补充特殊注意事项。</div></div>';
+  }
+  cats.forEach(cat=>{
+    html+='<div class="pc-section"><h3>'+escapeHtml(cat)+'</h3>';
+    byCat[cat].forEach(item=>{
+      const chk = item.on ? "☑" : "☐";
+      const checkedFlag = item.on ? "1" : "0";
+      if(item.custom){
+        const c=item.custom;
+        html+='<div class="pc-item" data-checked="'+checkedFlag+'"><span class="pc-chk" data-toggle="'+c.id+'">'+chk+'</span>'+
+              '<span class="txt">'+escapeHtml(c.text)+'</span>'+
+              '<button class="pc-del no-export" data-delcustom="'+c.id+'">删除</button></div>';
+      }else{
+        const p=item.p;
+        html+='<div class="pc-item" data-checked="'+checkedFlag+'"><span class="pc-chk" data-toggle="'+p.id+'">'+chk+'</span>'+
+              '<span class="txt">'+escapeHtml(p.text)+'</span>'+
+              '<button class="pc-del no-export" data-delauto="'+p.id+'">删除</button></div>';
+      }
+    });
+    html+='</div>';
+  });
+
+  const fu=getFollowUpText();
+  if(fu){
+    html+='<div class="pc-section"><h3>下次复诊</h3><div class="pc-followup"><b>'+escapeHtml(fu)+'</b></div></div>';
+  }
+
+  // 已移除（可恢复）区 —— 仅编辑时显示
+  const removedAuto = DATA.precautions.filter(p=>state.deletedAutoIds.has(p.id));
+  if(removedAuto.length || state.removedCustom.length){
+    html+='<div class="pc-section no-export"><h3>已移除的注意事项（点击「恢复」可撤销删除）</h3>';
+    removedAuto.forEach(p=>{
+      html+='<div class="pc-item removed"><span class="txt">'+escapeHtml(p.text)+'</span>'+
+            '<button class="pc-restore no-export" data-restoreauto="'+p.id+'">恢复</button></div>';
+    });
+    state.removedCustom.forEach(c=>{
+      html+='<div class="pc-item removed"><span class="txt">'+escapeHtml(c.text)+'</span>'+
+            '<button class="pc-restore no-export" data-restorecustom="'+c.id+'">恢复</button></div>';
+    });
+    html+='</div>';
+  }
+
+  html+='<div class="pc-foot"><span>'+(DATA.settings.doctorName?("主管医生："+escapeHtml(DATA.settings.doctorName)):"")+'</span>'+
+        '<span>'+(DATA.settings.footer?escapeHtml(DATA.settings.footer):"")+'</span>'+
+        '<span>生成时间：'+todayStr()+'</span></div>';
+  html+='<div class="disc" style="text-align:center;margin-top:6px">本注意事项为辅助工具，具体请以主治医师医嘱为准</div>';
+  card.innerHTML=html;
+
+  // bind events
+  card.querySelectorAll("[data-toggle]").forEach(sp=>{
+    sp.onclick=()=>{ const id=sp.dataset.toggle; state.checkedMap[id]=(state.checkedMap[id]!==false)?false:true; renderPreview(); };
+  });
+  card.querySelectorAll("[data-delauto]").forEach(b=>{
+    b.onclick=()=>{ state.deletedAutoIds.add(b.dataset.delauto); renderPreview(); };
+  });
+  card.querySelectorAll("[data-delcustom]").forEach(b=>{
+    b.onclick=()=>{ const it=state.customItems.find(c=>c.id===b.dataset.delcustom); if(it){ state.removedCustom.push(it); state.customItems=state.customItems.filter(c=>c.id!==b.dataset.delcustom); } renderPreview(); };
+  });
+  card.querySelectorAll("[data-restoreauto]").forEach(b=>{
+    b.onclick=()=>{ state.deletedAutoIds.delete(b.dataset.restoreauto); renderPreview(); };
+  });
+  card.querySelectorAll("[data-restorecustom]").forEach(b=>{
+    b.onclick=()=>{ const it=state.removedCustom.find(c=>c.id===b.dataset.restorecustom); if(it){ state.removedCustom=state.removedCustom.filter(c=>c.id!==b.dataset.restorecustom); state.customItems.push(it); } renderPreview(); };
+  });
+
+  $("customCount").textContent = "已添加 "+state.customItems.length+" 条特殊注意事项";
+}
+
+/* ===================== 提交 ===================== */
+function utf8ToB64url(str){
+  const bytes=new TextEncoder().encode(str);
+  let bin=""; bytes.forEach(b=> bin+=String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function buildPayload(){
+  const name=$("patientName").value.trim()||"（患者姓名）";
+  const date=$("visitDate").value||todayStr();
+  const auto=getVisibleAuto();
+  const byCat={};
+  auto.forEach(p=>{ if(state.checkedMap[p.id]!==false){ (byCat[p.category]=byCat[p.category]||[]).push(p.text); } });
+  state.customItems.forEach(c=>{ if(c.checked){ (byCat["特殊注意事项"]=byCat["特殊注意事项"]||[]).push(c.text); } });
+  const cats=CATEGORY_ORDER.filter(c=>byCat[c]&&byCat[c].length).concat(Object.keys(byCat).filter(c=>!CATEGORY_ORDER.includes(c)));
+  const groups=cats.map(cat=>({cat:cat, items:byCat[cat]}));
+  return {
+    clinic: DATA.settings.clinicName||"个性化注意事项",
+    patient: name, date: date,
+    groups: groups,
+    followUp: getFollowUpText(),
+    doctor: DATA.settings.doctorName||"",
+    footer: DATA.settings.footer||"",
+    generated: todayStr()
+  };
+}
+
+$("submitBtn").onclick=()=>{
+  if(!$("patientName").value.trim()){ toast("请先输入患者姓名"); $("patientName").focus(); return; }
+  renderPreview();
+  const text=buildText();
+  // 决定二维码内容：配置了「查看页地址」则二维码 = 短链接（微信/浏览器直接打开网页）；否则退回纯文本
+  let qrContent=text, mode="text";
+  if(DATA.settings.viewBaseUrl){
+    try{
+      const raw=DATA.settings.viewBaseUrl.trim().replace(/\/+$/,"");
+      const viewUrl= raw.endsWith("/view.html") ? raw : raw+"/view.html";
+      const link=viewUrl+"?d="+utf8ToB64url(JSON.stringify(buildPayload()));
+      qrContent=link; mode="link";
+    }catch(e){ qrContent=text; mode="text"; }
+  }
+  const qrBox=$("qrcode"); qrBox.innerHTML="";
+  $("qrTip").style.color="";
+  function tryGen(content){          // M 失败自动降级到 L（容量更大）
+    try{ return generateQRDataUrl(content,480,"M"); }
+    catch(e1){ return generateQRDataUrl(content,480,"L"); }
+  }
+  function paint(url, tipHtml){
+    state.qrDataUrl=url;
+    qrBox.innerHTML='<img src="'+url+'" width="240" height="240" alt="二维码" style="display:block;border-radius:6px">';
+    $("qrTip").innerHTML=tipHtml;
+    $("qrArea").style.display="flex";
+  }
+  try{
+    const url=tryGen(qrContent);
+    if(mode==="link"){
+      paint(url,"微信/浏览器扫码，<b>直接在手机查看</b>本页注意事项（适合内容不太长的患者）。");
+    }else{
+      paint(url,"二维码含纯文本内容。<br>微信扫描后会显示「复制」按钮，点开即可看；内容较长时建议用「打印 / 导出图片」更稳妥。");
+    }
+  }catch(err){
+    // 链接模式因 base64 膨胀，容量比纯文本更紧；超容量时自动回退纯文本（容量更大）
+    if(mode==="link"){
+      try{
+        const url2=tryGen(text);
+        paint(url2,"内容较长，二维码已自动切换为<b>纯文本模式</b>：微信扫描后出现「复制」按钮，点开即可看；也可改用「打印 / 导出图片」。");
+      }catch(e2){ fallbackFail(); }
+    }else{
+      fallbackFail();
+    }
+  }
+  function fallbackFail(){
+    $("qrArea").style.display="flex";
+    qrBox.innerHTML='<div class="qr-tip" style="color:var(--warn);max-width:230px">二维码容量已超限（约 500 个汉字）。请精简注意事项，或用「打印 / 导出图片 / Word」交给患者。</div>';
+  }
+  state.submitted=true;
+  $("exportBar").style.display="flex";
+  $("genHint").style.display="none";
+  toast("已生成最终版注意事项");
+};
+
+/* ===================== 导出 ===================== */
+$("printBtn").onclick=()=>{ window.print(); };
+
+$("wordBtn").onclick=()=>{
+  if(!state.submitted){ toast("请先提交生成最终版"); return; }
+  const name=$("patientName").value.trim()||"注意事项";
+  const html = wordDoc(buildText(), state.qrDataUrl);
+  const blob=new Blob([html],{type:"application/msword;charset=utf-8"});
+  download(blob, name+"_注意事项.doc");
+  toast("已导出 Word");
+};
+
+$("imgBtn").onclick=()=>{
+  if(!state.submitted){ toast("请先提交生成最终版"); return; }
+  const stage=document.createElement("div");
+  stage.style.cssText="position:fixed;left:-99999px;top:0;width:620px;background:#fff;padding:26px 30px;box-shadow:none";
+  stage.innerHTML=$("previewCard").innerHTML;
+  // 导出前剔除编辑控件（删除/恢复按钮）与未勾选项，保证最终图片只含已确认内容
+  stage.querySelectorAll(".no-export").forEach(n=>n.remove());
+  stage.querySelectorAll('.pc-item[data-checked="0"]').forEach(n=>n.remove());
+  if(state.qrDataUrl){
+    const q=document.createElement("div");
+    q.style.cssText="display:flex;flex-direction:column;align-items:center;margin-top:16px";
+    q.innerHTML='<img src="'+state.qrDataUrl+'" width="200" height="200">'+
+                '<div style="font-size:12px;color:#666;margin-top:6px">患者扫码即可查看本页注意事项</div>';
+    stage.appendChild(q);
+  }
+  document.body.appendChild(stage);
+  html2canvas(stage,{scale:2,backgroundColor:"#ffffff",useCORS:true}).then(canvas=>{
+    canvas.toBlob(blob=>{
+      const name=$("patientName").value.trim()||"注意事项";
+      download(blob, name+"_注意事项.png");
+      toast("已保存为图片");
+    });
+    stage.remove();
+  }).catch(()=>{ stage.remove(); toast("图片生成失败"); });
+};
+
+function wordDoc(text, qrUrl){
+  const lines=text.split("\n").map(l=>{
+    if(l.startsWith("【")) return "<h3 style='color:#0a5b63'>"+escapeHtml(l.replace(/【|】/g,""))+"</h3>";
+    if(l.startsWith("☐ ")) return "<p style='margin:4px 0'>☐ "+escapeHtml(l.slice(2))+"</p>";
+    if(l.trim()==="") return "<br>";
+    return "<p style='margin:4px 0'>"+escapeHtml(l)+"</p>";
+  });
+  const qr = qrUrl? '<img src="'+qrUrl+'" width="160" height="160" style="margin-top:12px"><p style="font-size:12px;color:#666">患者扫码即可查看本页注意事项</p>' : "";
+  return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body style="font-family:Microsoft YaHei;padding:24px">'+
+    lines.join("")+qr+'</body></html>';
+}
+
+function generateQRDataUrl(text, size, ecLevel){
+  if(typeof qrcode==="undefined") throw new Error("二维码组件未加载");
+  const qr=qrcode(0, ecLevel||"M");   // typeNumber 0 = 自动选择版本
+  qr.addData(text);
+  qr.make();
+  const count=qr.getModuleCount();
+  const quiet=2;                      // 静区，提升扫码识别率
+  const total=count+quiet*2;
+  const cell=Math.max(1, Math.floor(size/total));
+  const dim=cell*total;
+  const canvas=document.createElement("canvas");
+  canvas.width=dim; canvas.height=dim;
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,dim,dim);
+  ctx.fillStyle="#000000";
+  for(let r=0;r<count;r++){
+    for(let c=0;c<count;c++){
+      if(qr.isDark(r,c)) ctx.fillRect((c+quiet)*cell,(r+quiet)*cell,cell,cell);
+    }
+  }
+  return canvas.toDataURL("image/png");
+}
+
+function download(blob, filename){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },100);
+}
+
+/* ===================== 库管理视图 ===================== */
+function renderLib(){
+  // 治疗项目
+  const tm=$("treatmentManage"); tm.innerHTML="";
+  if(DATA.treatments.length===0){ tm.innerHTML='<div class="empty">暂无治疗项目。</div>'; }
+  DATA.treatments.forEach(t=>{
+    const row=document.createElement("div"); row.style.display="flex"; row.style.gap="8px"; row.style.margin="6px 0"; row.style.alignItems="center";
+    const inp=document.createElement("input"); inp.type="text"; inp.value=t.name; inp.style.flex="1";
+    inp.onchange=()=>{ t.name=inp.value.trim()||t.name; saveData(); renderTreatmentSelector(); toast("已保存"); };
+    const del=document.createElement("button"); del.className="btn warn sm"; del.textContent="删除";
+    del.onclick=()=>{
+      if(!confirm("删除治疗项目「"+t.name+"」？关联的注意事项不会被删除，但不再自动匹配该项目。")) return;
+      DATA.treatments=DATA.treatments.filter(x=>x.id!==t.id);
+      DATA.precautions.forEach(p=>p.treatmentIds=p.treatmentIds.filter(id=>id!==t.id));
+      saveData(); renderLib(); renderTreatmentSelector();
+    };
+    row.appendChild(inp); row.appendChild(del); tm.appendChild(row);
+  });
+
+  // 注意事项条目
+  const pm=$("precManage"); pm.innerHTML="";
+  if(DATA.precautions.length===0){ pm.innerHTML='<div class="empty">暂无注意事项条目。</div>'; }
+  const tbl=document.createElement("table"); tbl.className="lib-table";
+  tbl.innerHTML="<tr><th style='width:42%'>注意事项内容</th><th style='width:14%'>分类</th><th>关联治疗项目</th><th style='width:70px'>操作</th></tr>";
+  DATA.precautions.forEach(p=>{
+    const tr=document.createElement("tr");
+    const td1=document.createElement("td");
+    const t1=document.createElement("input"); t1.type="text"; t1.value=p.text;
+    t1.onchange=()=>{ p.text=t1.value.trim()||p.text; saveData(); };
+    td1.appendChild(t1);
+    const td2=document.createElement("td");
+    const t2=document.createElement("input"); t2.type="text"; t2.value=p.category; t2.style.maxWidth="120px";
+    t2.onchange=()=>{ p.category=t2.value.trim()||"其他"; saveData(); };
+    td2.appendChild(t2);
+    const td3=document.createElement("td");
+    const cc=document.createElement("div"); cc.className="chk-cell";
+    DATA.treatments.forEach(t=>{
+      const lab=document.createElement("label");
+      const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=p.treatmentIds.includes(t.id);
+      cb.onchange=()=>{ if(cb.checked){ if(!p.treatmentIds.includes(t.id)) p.treatmentIds.push(t.id); } else { p.treatmentIds=p.treatmentIds.filter(id=>id!==t.id); } saveData(); };
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(t.name)); cc.appendChild(lab);
+    });
+    td3.appendChild(cc);
+    const td4=document.createElement("td");
+    const del=document.createElement("button"); del.className="btn warn sm"; del.textContent="删除";
+    del.onclick=()=>{ if(!confirm("删除该注意事项条目？")) return; DATA.precautions=DATA.precautions.filter(x=>x.id!==p.id); saveData(); renderLib(); };
+    td4.appendChild(del);
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+    tbl.appendChild(tr);
+  });
+  pm.appendChild(tbl);
+}
+
+$("addTreatmentBtn").onclick=()=>{
+  const inp=$("newTreatment"); const v=inp.value.trim();
+  if(!v){ toast("请输入项目名称"); return; }
+  DATA.treatments.push({id:uid(),name:v}); saveData(); inp.value=""; renderLib(); renderTreatmentSelector(); toast("已添加");
+};
+$("addPrecBtn").onclick=()=>{
+  const t=$("newPrecText").value.trim(); if(!t){ toast("请输入注意事项内容"); return; }
+  const c=$("newPrecCat").value.trim()||"其他";
+  DATA.precautions.push({id:uid(),text:t,category:c,treatmentIds:[]});
+  saveData(); $("newPrecText").value=""; $("newPrecCat").value=""; renderLib(); toast("已添加");
+};
+
+/* ===================== 设置视图 ===================== */
+function renderSettings(){
+  $("setClinic").value=DATA.settings.clinicName||"";
+  $("setDoctor").value=DATA.settings.doctorName||"";
+  $("setFooter").value=DATA.settings.footer||"";
+  $("setViewUrl").value=DATA.settings.viewBaseUrl||"";
+  $("hdrClinic").textContent = DATA.settings.clinicName? DATA.settings.clinicName : "";
+}
+$("saveSetBtn").onclick=()=>{
+  DATA.settings.clinicName=$("setClinic").value.trim();
+  DATA.settings.doctorName=$("setDoctor").value.trim();
+  DATA.settings.footer=$("setFooter").value.trim();
+  DATA.settings.viewBaseUrl=$("setViewUrl").value.trim();
+  saveData(); renderSettings(); renderPreview(); toast("设置已保存");
+};
+
+/* ===================== 初始化 ===================== */
+// 让二维码库以 UTF-8 编码中文，确保手机扫码不乱码
+if(typeof qrcode!=="undefined" && qrcode.stringToBytesFuncs){
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs["UTF-8"];
+}
+renderTreatmentSelector();
+renderPreview();
+renderSettings();
+
+if(!_storageOK){
+  const b=document.createElement("div");
+  b.style.cssText="background:#fff8e6;border:1px solid #f3d98b;color:#8a6d1b;padding:10px 14px;margin:14px auto;max-width:1180px;border-radius:8px;font-size:13px";
+  b.innerHTML="⚠️ 当前浏览器限制了本地文件的数据保存（多为直接双击打开所致）。本次编辑仅在本次打开内有效，关闭后丢失。如需永久保存注意事项库，请改用「本地服务器」打开（见下方说明），或使用 Chrome/Edge 通过 http 访问。";
+  document.querySelector(".wrap").parentNode.insertBefore(b, document.querySelector(".wrap"));
+}
+</script>
+</body>
+</html>
