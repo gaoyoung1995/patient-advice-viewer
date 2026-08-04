@@ -16,19 +16,19 @@
   .head{border-bottom:2px solid var(--brand);padding-bottom:12px;margin-bottom:14px}
   .clinic{color:var(--brand);font-weight:700;font-size:15px;letter-spacing:.5px}
   .title{font-size:22px;font-weight:800;margin-top:4px}
-  .meta{display:flex;gap:18px;flex-wrap:wrap;color:#444;font-size:14px;margin:10px 0 4px}
+  .meta{display:flex;gap:18px;flex-wrap:wrap;color:#444;font-size:15px;margin:10px 0 4px}
   .meta b{color:var(--ink)}
   .sec{margin-top:18px}
-  .sec h3{font-size:16px;margin:0 0 8px;color:var(--brand);
+  .sec h3{font-size:18px;margin:0 0 8px;color:var(--brand);
     border-left:4px solid var(--brand);padding-left:8px}
-  .item{display:flex;gap:8px;padding:7px 0;border-bottom:1px dashed #eee;font-size:15px}
+  .item{display:flex;gap:8px;padding:9px 0;border-bottom:1px dashed #eee;font-size:17px}
   .item .box{flex:0 0 auto;width:18px;height:18px;border:1.5px solid var(--brand);border-radius:4px;
-    margin-top:3px;position:relative}
-  .follow{background:#eafaf4;border:1px solid #bfe9da;border-radius:10px;padding:12px 14px;
-    color:#1f5c4f;font-size:15px;font-weight:600}
+    margin-top:4px;position:relative}
+  .follow{background:#eafaf4;border:1px solid #bfe9da;border-radius:10px;padding:14px 16px;
+    color:#1f5c4f;font-size:17px;font-weight:600;line-height:1.7}
   .foot{margin-top:26px;padding-top:12px;border-top:1px solid var(--line);
-    color:var(--muted);font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
-  .disc{text-align:center;color:var(--warn);font-size:12px;margin-top:18px}
+    color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .disc{text-align:center;color:var(--warn);font-size:13px;margin-top:18px}
   .err{padding:40px 20px;text-align:center;color:var(--warn)}
   @media print{
     body{background:#fff}
@@ -76,7 +76,7 @@ function normalize(p){
     patient:  p.p  || p.patient  || '',
     date:     p.d  || p.date     || '',
     groups:   (p.g || p.groups || []).map(x=>({ cat: x.t||x.cat, items: x.i||x.items||[] })),
-    followUp: p.f  || p.followUp || '',
+    followUp: (p.f!=null ? p.f : (p.followUp!=null ? p.followUp : '')),
     doctor:   p.dr || p.doctor   || '',
     footer:   p.ft || p.footer   || '',
     generated:p.g2 || p.generated|| ''
@@ -100,7 +100,7 @@ function render(){
 
   let html = '';
   html += '<div class="head"><div class="clinic">'+esc(p.clinic||'个性化注意事项')+'</div>'+
-          '<div class="title">治疗后个性化注意事项</div></div>';
+          '<div class="title">请仔细阅读本次注意事项</div></div>';
   html += '<div class="meta"><span>患者：<b>'+esc(p.patient||'')+'</b></span>'+
           '<span>就诊日期：'+esc(p.date||'')+'</span></div>';
 
@@ -113,8 +113,13 @@ function render(){
     html += '</div>';
   });
 
-  if(p.followUp){
-    html += '<div class="sec"><h3>下次复诊</h3><div class="follow">'+esc(p.followUp)+'</div></div>';
+  let fu = p.followUp;
+  if(typeof fu === 'string') fu = fu ? [fu] : [];
+  if(!Array.isArray(fu)) fu = [];
+  if(fu.length){
+    html += '<div class="sec"><h3>下次复诊</h3>';
+    fu.forEach(t=>{ html += '<div class="follow" style="margin-bottom:8px">'+esc(t)+'</div>'; });
+    html += '</div>';
   }
 
   html += '<div class="foot">';
