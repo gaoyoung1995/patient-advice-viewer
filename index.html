@@ -33,10 +33,11 @@
   .panel h2{font-size:15px;margin:0 0 12px;color:var(--primary-dark);border-bottom:2px solid var(--primary-soft);
     padding-bottom:8px}
   label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px;font-weight:500}
-  input[type=text],input[type=date],input[type=time],textarea,select{width:100%;padding:9px 10px;border:1px solid var(--line);
+  input[type=text],input[type=date],input[type=time],input[type=number],textarea,select{width:100%;padding:9px 10px;border:1px solid var(--line);
     border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--text)}
   textarea{resize:vertical;min-height:60px}
   input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+  input[type=number]{width:auto}
   .treatment-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;
     border:1px solid var(--line);border-radius:8px;padding:8px}
   .treatment-list label{display:flex;align-items:center;gap:8px;margin:0;color:var(--text);cursor:pointer}
@@ -54,6 +55,13 @@
   .add-row{display:flex;gap:8px}
   .add-row input{flex:1}
   .count{font-size:12px;color:var(--muted);margin-top:6px}
+  /* 复诊多条目 */
+  .fu-item{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:#fafcfc}
+  .fu-item-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .fu-item-head span{font-weight:600;color:var(--primary-dark)}
+  .fu-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .fu-field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:170px}
+  .fu-field>label{margin:0}
   /* preview card */
   #previewCard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:26px 30px;
     box-shadow:var(--shadow);min-height:400px}
@@ -102,6 +110,8 @@
   .chk-cell label{display:inline-flex;align-items:center;gap:4px;margin:0;font-size:12px;color:var(--text);font-weight:400}
   .empty{color:var(--muted);font-size:13px;padding:10px 0}
   .disc{font-size:12px;color:var(--muted);margin-top:10px}
+  .lib-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  .lib-toolbar .lib-saved{font-size:12px;color:var(--ok);margin-left:4px}
   @media print{
     body{background:#fff}
     header,.tabs,.wrap > .panel,.export-bar,.hint,#formPanel,#tabBar,.toast{display:none!important}
@@ -154,12 +164,9 @@
         <div class="count" id="customCount"></div>
 
         <h2 class="mt">③ 下次复诊</h2>
-        <label>复诊内容（如：抽血查HCG / 阴道B超）</label>
-        <input type="text" id="fuContent" placeholder="例如：返院抽血确认妊娠">
-        <div class="row2">
-          <div><label>复诊日期</label><input type="date" id="fuDate"></div>
-          <div><label>复诊时间</label><input type="time" id="fuTime"></div>
-        </div>
+        <div id="followList"></div>
+        <button class="btn ghost block mt" id="addFollowBtn" type="button">+ 添加复诊条目</button>
+        <div class="disc">可添加多个复诊条目。每条可填：相对时间（数字＋月/周/天）、具体复诊日期（二选一）、复诊时间（上班时段 07:00–18:00，仅整点/半点）、复诊内容（下拉选择，选项可在「设置」里增删改，也可临时「自定义…」）。后台自动拼接成一句。</div>
 
         <button class="btn block mt" id="submitBtn">提交注意事项（生成最终版）</button>
         <div class="hint" id="genHint">填写患者姓名并选择治疗项目后，右侧会自动组合注意事项；可勾选/删除，也可补充特殊条目。完成后点击上方按钮生成最终版。</div>
@@ -184,9 +191,17 @@
   <!-- ============ 库管理视图 ============ -->
   <div class="view" id="view-lib">
     <div class="panel">
+      <div class="lib-toolbar">
+        <button class="btn sm" id="saveLibBtn">保存修改</button>
+        <button class="btn ghost sm" id="exportLibBtn">导出备份</button>
+        <button class="btn ghost sm" id="importLibBtn">导入备份</button>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+        <span class="lib-saved" id="libSaved"></span>
+      </div>
+      <div class="disc">数据仅保存在<b>当前浏览器</b>中。换用其他浏览器或电脑打开时，请先在本页点「导出备份」保存为文件，再到另一处点「导入备份」载入，注意事项库与设置即可同步。</div>
       <h2>治疗项目管理</h2>
       <div class="add-row">
-        <input type="text" id="newTreatment" placeholder="新增治疗项目，如：促排卵监测">
+        <input type="text" id="newTreatment" placeholder="新增治疗项目">
         <button class="btn sm" id="addTreatmentBtn">添加项目</button>
       </div>
       <div id="treatmentManage" class="mt"></div>
@@ -215,6 +230,15 @@
       <label>患者查看页地址（让二维码变成「扫码打开网页」，选填）</label>
       <input type="text" id="setViewUrl" placeholder="例如：https://你的域名/view.html">
       <div class="disc">填了这项后，二维码里只放一个网页链接，患者用微信/浏览器扫码会<b>直接打开排版好的注意事项页</b>（微信体验最好）。注意：二维码容量有限（约 500 汉字），内容很长时会自动回退为纯文本模式。把本目录下的 <code>view.html</code> 部署到任意静态空间后，把它的网址填这里即可。需要我帮你一键部署吗？</div>
+
+      <h2 class="mt">复诊内容下拉选项</h2>
+      <div class="disc">这些选项会出现在每次「复诊内容」的下拉框中。可在此新增、修改、删除；保存后回到「生成注意事项」页的复诊条目里即时生效。</div>
+      <div id="fuOptList"></div>
+      <div class="add-row mt">
+        <input type="text" id="newFuOpt" placeholder="如：拨打一诊室电话028-8550 3579预约复诊，返院抽血查HCG确认妊娠">
+        <button class="btn sm" id="addFuOptBtn">添加</button>
+      </div>
+
       <button class="btn mt" id="saveSetBtn">保存设置</button>
       <div class="disc">所有数据仅保存在本机浏览器中（localStorage），不会上传任何服务器。建议定期导出备份（后续版本支持）。</div>
     </div>
@@ -228,6 +252,15 @@
 /* ===================== 数据层 ===================== */
 const STORE_KEY = "ga_data_v1";
 const CATEGORY_ORDER = ["用药指导","生活与活动","饮食注意","观察与复诊","特殊注意事项","其他"];
+function defaultFuOptions(){
+  return [
+    "拨打一诊室电话028-8550 3579预约复诊，返院抽血查HCG确认妊娠",
+    "拨打一诊室电话028-8550 3579预约复诊，阴道B超",
+    "拨打一诊室电话028-8550 3579预约复诊，返院B超监测",
+    "微信联系主诊医生预约复诊",
+    "到院前台挂号预约复诊"
+  ];
+}
 let _memStore = null;          // file:// 下 localStorage 不可用时的内存回退
 let _storageOK = true;
 
@@ -246,7 +279,7 @@ function seedData(){
     fu: uid(), iui: uid(), pick: uid(), trans: uid(), lute: uid(), hys: uid(), hsg: uid()
   };
   return {
-    settings:{ clinicName:"", doctorName:"", footer:"", viewBaseUrl:"" },
+    settings:{ clinicName:"", doctorName:"", footer:"", viewBaseUrl:"", followUpOptions:defaultFuOptions() },
     treatments:[
       {id:t.fu,   name:"促排卵监测"},
       {id:t.iui,  name:"人工授精(IUI)"},
@@ -288,7 +321,11 @@ function seedData(){
 let DATA = loadData();
 function loadData(){
   const raw = _safeGet();
-  if(raw){ try{ const d = JSON.parse(raw); if(d && d.treatments) return d; }catch(e){} }
+  if(raw){ try{ const d = JSON.parse(raw); if(d && d.treatments){
+    d.settings = d.settings || {};
+    if(!Array.isArray(d.settings.followUpOptions)) d.settings.followUpOptions = defaultFuOptions();
+    return d;
+  } }catch(e){} }
   return seedData();
 }
 function saveData(){ _safeSet(JSON.stringify(DATA)); }
@@ -300,7 +337,7 @@ const state = {
   deletedAutoIds: new Set(),
   customItems: [],         // {id,text,checked}
   removedCustom: [],       // 被删除但可恢复的特殊注意事项
-  followUp: {content:"", date:"", time:""},
+  followUps: [],
   submitted: false,
   qrDataUrl: ""
 };
@@ -359,9 +396,12 @@ $("customInput").addEventListener("keydown",e=>{ if(e.key==="Enter") addCustom()
 
 $("patientName").addEventListener("input", renderPreview);
 $("visitDate").addEventListener("input", renderPreview);
-$("fuContent").addEventListener("input",()=>{ state.followUp.content=$("fuContent").value; renderPreview(); });
-$("fuDate").addEventListener("input",()=>{ state.followUp.date=$("fuDate").value; renderPreview(); });
-$("fuTime").addEventListener("input",()=>{ state.followUp.time=$("fuTime").value; renderPreview(); });
+// 复诊：多条目（相对时间 / 日期 / 时间 / 预约方式 / 内容 直接拼接）
+function newFollowUp(){
+  const opts=(DATA.settings.followUpOptions||[]);
+  return { id:uid(), relNum:"", relUnit:"月", date:"", hour:"", minute:"", content: opts.length? opts[0] : "" };
+}
+$("addFollowBtn").onclick=()=>{ state.followUps.push(newFollowUp()); renderFollowUps(); renderPreview(); };
 $("visitDate").value = todayStr();
 
 /* ===================== 生成视图：预览 ===================== */
@@ -369,11 +409,102 @@ function getVisibleAuto(){
   const sel=new Set(state.selectedTreatmentIds);
   return DATA.precautions.filter(p=> p.treatmentIds.some(tid=>sel.has(tid)) && !state.deletedAutoIds.has(p.id));
 }
-function getFollowUpText(){
-  const f=state.followUp;
-  if(!f.content && !f.date && !f.time) return "";
-  const when = (f.date||"约定时间") + (f.time? " "+f.time : "");
-  return "请于 "+when+" 进行：" + (f.content||"复诊") + "。";
+function buildOneFollowUp(f){
+  let s="";
+  const n=parseInt(f.relNum,10);
+  if(!isNaN(n)&&n>0) s += n + (f.relUnit||"月") + "后";
+  else if(f.date) s += "于"+f.date;
+  if(f.hour && f.minute) s += f.hour+":"+f.minute;
+  const content=(f.content||"").trim();
+  if(content) s += (s? "，"+content : content);
+  if(!s) return "";
+  return s + "。";
+}
+function getFollowUpTexts(){
+  return (state.followUps||[]).map(buildOneFollowUp).filter(t=>t);
+}
+/* 复诊条目列表渲染（仅在添加/删除时重建，输入时只更新 state + 预览，避免丢焦点） */
+function renderFollowUps(){
+  const box=$("followList"); box.innerHTML="";
+  if(!state.followUps.length){ box.innerHTML='<div class="empty">暂无复诊条目，点击下方「添加复诊条目」。</div>'; }
+  state.followUps.forEach((f,idx)=>{
+    const card=document.createElement("div"); card.className="fu-item";
+    const head=document.createElement("div"); head.className="fu-item-head";
+    const title=document.createElement("span"); title.textContent="复诊条目 "+(idx+1);
+    const del=document.createElement("button"); del.className="btn warn sm"; del.textContent="删除";
+    del.onclick=()=>{
+      if(state.followUps.length>1 || confirm("删除该复诊条目？")){
+        state.followUps=state.followUps.filter(x=>x.id!==f.id); renderFollowUps(); renderPreview();
+      }
+    };
+    head.appendChild(title); head.appendChild(del); card.appendChild(head);
+
+    // 行1：相对时间 + 复诊日期
+    const row1=document.createElement("div"); row1.className="fu-row";
+    const relField=document.createElement("div"); relField.className="fu-field";
+    const relLab=document.createElement("label"); relLab.textContent="相对时间（数字＋月/周/天）";
+    const relWrap=document.createElement("div"); relWrap.className="add-row";
+    const relNum=document.createElement("input"); relNum.type="number"; relNum.min="1"; relNum.max="36"; relNum.placeholder="如 1"; relNum.value=f.relNum; relNum.style.cssText="flex:0 0 72px";
+    const relUnit=document.createElement("select"); relUnit.style.cssText="flex:0 0 auto;width:auto";
+    ["月","周","天"].forEach(u=>{ const o=document.createElement("option"); o.value=u; o.textContent=u; if(u===f.relUnit) o.selected=true; relUnit.appendChild(o); });
+    const relSuffix=document.createElement("span"); relSuffix.textContent="后"; relSuffix.style.alignSelf="center";
+    relNum.oninput=()=>{ f.relNum=relNum.value; renderPreview(); };
+    relUnit.onchange=()=>{ f.relUnit=relUnit.value; renderPreview(); };
+    relWrap.appendChild(relNum); relWrap.appendChild(relUnit); relWrap.appendChild(relSuffix);
+    relField.appendChild(relLab); relField.appendChild(relWrap);
+
+    const dateField=document.createElement("div"); dateField.className="fu-field";
+    const dateLab=document.createElement("label"); dateLab.textContent="复诊日期（与相对时间二选一）";
+    const dateIn=document.createElement("input"); dateIn.type="date"; dateIn.value=f.date;
+    dateIn.oninput=()=>{ f.date=dateIn.value; renderPreview(); };
+    dateField.appendChild(dateLab); dateField.appendChild(dateIn);
+    row1.appendChild(relField); row1.appendChild(dateField); card.appendChild(row1);
+
+    // 行2：复诊时间 + 复诊内容（合并原「预约方式」与「复诊内容」为下拉）
+    const row2=document.createElement("div"); row2.className="fu-row";
+    const timeField=document.createElement("div"); timeField.className="fu-field";
+    const timeLab=document.createElement("label"); timeLab.textContent="复诊时间（上班时段 07:00–18:00）";
+    const timeWrap=document.createElement("div"); timeWrap.className="add-row";
+    const hourSel=document.createElement("select"); hourSel.style.cssText="flex:0 0 auto;width:auto";
+    const hBlank=document.createElement("option"); hBlank.value=""; hBlank.textContent="时"; hourSel.appendChild(hBlank);
+    for(let h=7;h<=18;h++){ const v=String(h).padStart(2,"0"); const o=document.createElement("option"); o.value=v; o.textContent=v; if(v===f.hour) o.selected=true; hourSel.appendChild(o); }
+    const colon=document.createElement("span"); colon.textContent=":"; colon.style.alignSelf="center";
+    const minSel=document.createElement("select"); minSel.style.cssText="flex:0 0 auto;width:auto";
+    const mBlank=document.createElement("option"); mBlank.value=""; mBlank.textContent="分"; minSel.appendChild(mBlank);
+    ["00","30"].forEach(m=>{ const o=document.createElement("option"); o.value=m; o.textContent=m; if(m===f.minute) o.selected=true; minSel.appendChild(o); });
+    hourSel.onchange=()=>{ f.hour=hourSel.value; renderPreview(); };
+    minSel.onchange=()=>{ f.minute=minSel.value; renderPreview(); };
+    timeWrap.appendChild(hourSel); timeWrap.appendChild(colon); timeWrap.appendChild(minSel);
+    timeField.appendChild(timeLab); timeField.appendChild(timeWrap);
+
+    // 复诊内容：下拉选择（选项在「设置」中维护；另含「自定义…」临时输入）
+    const contentField=document.createElement("div"); contentField.className="fu-field"; contentField.style.flex="1";
+    const contentLab=document.createElement("label"); contentLab.textContent="复诊内容";
+    const contentSel=document.createElement("select");
+    const opts=(DATA.settings.followUpOptions||[]);
+    if(!opts.length){
+      const o=document.createElement("option"); o.value=""; o.textContent="（请在设置里添加复诊内容选项）"; contentSel.appendChild(o);
+    } else {
+      opts.forEach(p=>{ const o=document.createElement("option"); o.value=p; o.textContent=p; if(p===f.content) o.selected=true; contentSel.appendChild(o); });
+      if(f.content && !opts.includes(f.content)){
+        const o=document.createElement("option"); o.value=f.content; o.textContent=f.content+"(自定义)"; o.selected=true; contentSel.appendChild(o);
+      }
+      const customO=document.createElement("option"); customO.value="__custom__"; customO.textContent="自定义…"; contentSel.appendChild(customO);
+    }
+    contentSel.onchange=()=>{
+      if(contentSel.value==="__custom__"){
+        const v=prompt("请输入复诊内容：", f.content||"");
+        f.content = (v!==null && v.trim())? v.trim() : (opts[0]||"");
+      } else {
+        f.content=contentSel.value;
+      }
+      renderFollowUps(); renderPreview();
+    };
+    contentField.appendChild(contentLab); contentField.appendChild(contentSel);
+    row2.appendChild(timeField); row2.appendChild(contentField); card.appendChild(row2);
+
+    box.appendChild(card);
+  });
 }
 
 function buildText(){
@@ -393,8 +524,8 @@ function buildText(){
     byCat[cat].forEach(t=>lines.push("☐ "+t));
     lines.push("");
   });
-  const fu=getFollowUpText();
-  if(fu){ lines.push("【下次复诊】"); lines.push(fu); lines.push(""); }
+  const fus=getFollowUpTexts();
+  if(fus.length){ lines.push("【下次复诊】"); fus.forEach(t=>lines.push(t)); lines.push(""); }
   if(DATA.settings.doctorName) lines.push("主管医生："+DATA.settings.doctorName);
   if(DATA.settings.footer) lines.push(DATA.settings.footer);
   lines.push("（本注意事项为辅助工具，具体请以主治医师医嘱为准）");
@@ -407,7 +538,7 @@ function renderPreview(){
   const date=$("visitDate").value||todayStr();
   let html="";
   html+='<div class="pc-head"><div class="clinic">'+(escapeHtml(DATA.settings.clinicName)||"个性化注意事项")+'</div>'+
-        '<div class="title">治疗后个性化注意事项</div></div>';
+        '<div class="title">请仔细阅读本次注意事项</div></div>';
   html+='<div class="pc-meta"><span>患者：<b>'+escapeHtml(name)+'</b></span><span>就诊日期：'+escapeHtml(date)+'</span></div>';
 
   const auto=getVisibleAuto();
@@ -442,9 +573,11 @@ function renderPreview(){
     html+='</div>';
   });
 
-  const fu=getFollowUpText();
-  if(fu){
-    html+='<div class="pc-section"><h3>下次复诊</h3><div class="pc-followup"><b>'+escapeHtml(fu)+'</b></div></div>';
+  const fus=getFollowUpTexts();
+  if(fus.length){
+    html+='<div class="pc-section"><h3>下次复诊</h3>';
+    fus.forEach(t=>{ html+='<div class="pc-followup" style="margin-bottom:8px"><b>'+escapeHtml(t)+'</b></div>'; });
+    html+='</div>';
   }
 
   // 已移除（可恢复）区 —— 仅编辑时显示
@@ -512,7 +645,7 @@ function buildPayload(){
     c: DATA.settings.clinicName||"个性化注意事项",
     p: name, d: date,
     g: groups,
-    f: getFollowUpText()
+    f: getFollowUpTexts()
   };
   if(DATA.settings.doctorName) o.dr=DATA.settings.doctorName;   // 空字段省略，进一步压缩
   if(DATA.settings.footer) o.ft=DATA.settings.footer;
@@ -664,6 +797,7 @@ function renderLib(){
   DATA.treatments.forEach(t=>{
     const row=document.createElement("div"); row.style.display="flex"; row.style.gap="8px"; row.style.margin="6px 0"; row.style.alignItems="center";
     const inp=document.createElement("input"); inp.type="text"; inp.value=t.name; inp.style.flex="1";
+    inp.oninput=()=>{ t.name=inp.value; scheduleAutoSave(); renderTreatmentSelector(); };
     inp.onchange=()=>{ t.name=inp.value.trim()||t.name; saveData(); renderTreatmentSelector(); toast("已保存"); };
     const del=document.createElement("button"); del.className="btn warn sm"; del.textContent="删除";
     del.onclick=()=>{
@@ -684,10 +818,12 @@ function renderLib(){
     const tr=document.createElement("tr");
     const td1=document.createElement("td");
     const t1=document.createElement("input"); t1.type="text"; t1.value=p.text;
+    t1.oninput=()=>{ p.text=t1.value; scheduleAutoSave(); };
     t1.onchange=()=>{ p.text=t1.value.trim()||p.text; saveData(); };
     td1.appendChild(t1);
     const td2=document.createElement("td");
     const t2=document.createElement("input"); t2.type="text"; t2.value=p.category; t2.style.maxWidth="120px";
+    t2.oninput=()=>{ p.category=t2.value; scheduleAutoSave(); };
     t2.onchange=()=>{ p.category=t2.value.trim()||"其他"; saveData(); };
     td2.appendChild(t2);
     const td3=document.createElement("td");
@@ -721,6 +857,43 @@ $("addPrecBtn").onclick=()=>{
   saveData(); $("newPrecText").value=""; $("newPrecCat").value=""; renderLib(); toast("已添加");
 };
 
+/* ===================== 库管理：保存 / 导出 / 导入 备份 ===================== */
+let _autoTimer=null;
+function scheduleAutoSave(){
+  clearTimeout(_autoTimer);
+  _autoTimer=setTimeout(()=>{
+    saveData();
+    const s=$("libSaved");
+    if(s){ s.textContent="已自动保存"; clearTimeout(s._t); s._t=setTimeout(()=>s.textContent="",1500); }
+  },600);
+}
+$("saveLibBtn").onclick=()=>{ saveData(); const s=$("libSaved"); if(s) s.textContent="已保存"; toast("已保存"); };
+$("exportLibBtn").onclick=()=>{
+  const blob=new Blob([JSON.stringify(DATA,null,2)],{type:"application/json;charset=utf-8"});
+  download(blob,"注意事项库备份_"+todayStr()+".json");
+  toast("已导出备份文件");
+};
+$("importLibBtn").onclick=()=>{ $("importFile").click(); };
+$("importFile").addEventListener("change",e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!d || !Array.isArray(d.treatments) || !Array.isArray(d.precautions)){ toast("备份文件格式不正确"); e.target.value=""; return; }
+      if(!confirm("导入备份将覆盖当前本机的注意事项库与设置，确定继续？")){ e.target.value=""; return; }
+      DATA = d;
+      if(!DATA.settings) DATA.settings={clinicName:"",doctorName:"",footer:"",viewBaseUrl:"",followUpOptions:defaultFuOptions()};
+      if(!Array.isArray(DATA.settings.followUpOptions)) DATA.settings.followUpOptions=defaultFuOptions();
+      saveData();
+      renderLib(); renderTreatmentSelector(); renderSettings(); renderPreview();
+      toast("备份已导入");
+    }catch(err){ toast("读取备份失败："+err.message); }
+    e.target.value="";
+  };
+  r.readAsText(f,"utf-8");
+});
+
 /* ===================== 设置视图 ===================== */
 function renderSettings(){
   $("setClinic").value=DATA.settings.clinicName||"";
@@ -728,7 +901,26 @@ function renderSettings(){
   $("setFooter").value=DATA.settings.footer||"";
   $("setViewUrl").value=DATA.settings.viewBaseUrl||"";
   $("hdrClinic").textContent = DATA.settings.clinicName? DATA.settings.clinicName : "";
+  renderFuOptions();
 }
+function renderFuOptions(){
+  const box=$("fuOptList"); if(!box) return; box.innerHTML="";
+  const opts=DATA.settings.followUpOptions||[];
+  if(!opts.length){ box.innerHTML='<div class="empty">暂无选项，请在下方添加。</div>'; return; }
+  opts.forEach((o,idx)=>{
+    const row=document.createElement("div"); row.className="add-row"; row.style.marginBottom="8px";
+    const inp=document.createElement("input"); inp.type="text"; inp.value=o;
+    inp.oninput=()=>{ DATA.settings.followUpOptions[idx]=inp.value; saveData(); };
+    const del=document.createElement("button"); del.className="btn warn sm"; del.textContent="删除";
+    del.onclick=()=>{ DATA.settings.followUpOptions.splice(idx,1); saveData(); renderFuOptions(); renderFollowUps(); };
+    row.appendChild(inp); row.appendChild(del); box.appendChild(row);
+  });
+}
+$("addFuOptBtn").onclick=()=>{
+  const v=$("newFuOpt").value.trim(); if(!v) return;
+  if(!DATA.settings.followUpOptions) DATA.settings.followUpOptions=[];
+  DATA.settings.followUpOptions.push(v); $("newFuOpt").value=""; saveData(); renderFuOptions(); renderFollowUps();
+};
 $("saveSetBtn").onclick=()=>{
   DATA.settings.clinicName=$("setClinic").value.trim();
   DATA.settings.doctorName=$("setDoctor").value.trim();
@@ -745,6 +937,10 @@ if(typeof qrcode!=="undefined" && qrcode.stringToBytesFuncs){
 renderTreatmentSelector();
 renderPreview();
 renderSettings();
+
+// 复诊模块初始化：若尚无条目则给一条默认空条目，并渲染列表
+if(!state.followUps.length) state.followUps.push(newFollowUp());
+renderFollowUps();
 
 if(!_storageOK){
   const b=document.createElement("div");
