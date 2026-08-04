@@ -29,23 +29,14 @@
   .foot{margin-top:26px;padding-top:12px;border-top:1px solid var(--line);
     color:var(--muted);font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
   .disc{text-align:center;color:var(--warn);font-size:12px;margin-top:18px}
-  .topbar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);
-    padding:8px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)}
-  .topbar button{border:1px solid var(--brand);color:var(--brand);background:#fff;
-    border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer}
   .err{padding:40px 20px;text-align:center;color:var(--warn)}
   @media print{
     body{background:#fff}
-    .topbar{display:none}
     .page{max-width:none;padding:0}
   }
 </style>
 </head>
 <body>
-  <div class="topbar no-print">
-    <span>本页由医生端生成，仅供您本人查阅</span>
-    <button onclick="window.print()">打印 / 存为PDF</button>
-  </div>
   <div class="page" id="page">
     <div class="err" id="err" style="display:none">页面内容无法识别，请重新扫描或联系医生。</div>
     <div id="content"></div>
@@ -77,6 +68,20 @@ function decodePayload(d){
   }catch(e){}
   throw new Error('unrecognized');
 }
+/* 兼容短字段名（医生端新压缩格式）与旧长字段名：统一映射为渲染用长字段 */
+function normalize(p){
+  if(!p || typeof p!=='object') return p;
+  return {
+    clinic:   p.c  || p.clinic   || '个性化注意事项',
+    patient:  p.p  || p.patient  || '',
+    date:     p.d  || p.date     || '',
+    groups:   (p.g || p.groups || []).map(x=>({ cat: x.t||x.cat, items: x.i||x.items||[] })),
+    followUp: p.f  || p.followUp || '',
+    doctor:   p.dr || p.doctor   || '',
+    footer:   p.ft || p.footer   || '',
+    generated:p.g2 || p.generated|| ''
+  };
+}
 function esc(s){
   return (s==null?'':String(s))
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -90,7 +95,7 @@ function render(){
   if(!d){ errEl.style.display='block'; return; }
   let p;
   try{
-    p = decodePayload(d);
+    p = normalize(decodePayload(d));
   }catch(e){ errEl.style.display='block'; return; }
 
   let html = '';
