@@ -51,15 +51,31 @@
     <div id="content"></div>
   </div>
 
+<script src="vendor/pako.min.js"></script>
 <script>
 /* ---------- base64(url-safe) + UTF-8 解码 ---------- */
-function b64urlDecode(s){
+function b64urlToBytes(s){
   s = s.replace(/-/g,'+').replace(/_/g,'/');
   while(s.length % 4) s += '=';
   const bin = atob(s);
   const bytes = new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
-  return new TextDecoder('utf-8').decode(bytes);
+  return bytes;
+}
+function b64urlDecode(s){
+  return new TextDecoder('utf-8').decode(b64urlToBytes(s));
+}
+/* 兼容两种二维码：新版(压缩) 与 旧版(未压缩 JSON) */
+function decodePayload(d){
+  const bytes = b64urlToBytes(d);
+  try{                                   // 先按压缩格式解（pako.inflate）
+    const inflated = new TextDecoder('utf-8').decode(pako.inflate(bytes));
+    return JSON.parse(inflated);
+  }catch(e){}
+  try{                                   // 回退：旧版未压缩 JSON
+    return JSON.parse(b64urlDecode(d));
+  }catch(e){}
+  throw new Error('unrecognized');
 }
 function esc(s){
   return (s==null?'':String(s))
@@ -74,7 +90,7 @@ function render(){
   if(!d){ errEl.style.display='block'; return; }
   let p;
   try{
-    p = JSON.parse(b64urlDecode(d));
+    p = decodePayload(d);
   }catch(e){ errEl.style.display='block'; return; }
 
   let html = '';
