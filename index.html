@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>个性化注意事项生成器</title>
 <script src="vendor/qrcode.min.js"></script>
+<script src="vendor/pako.min.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <style>
   :root{
@@ -493,6 +494,11 @@ function utf8ToB64url(str){
   let bin=""; bytes.forEach(b=> bin+=String.fromCharCode(b));
   return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
+// 把 Uint8Array（压缩后的字节）编码为 url-safe base64
+function bytesToB64url(bytes){
+  let bin=""; for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
 function buildPayload(){
   const name=$("patientName").value.trim()||"（患者姓名）";
   const date=$("visitDate").value||todayStr();
@@ -523,7 +529,10 @@ $("submitBtn").onclick=()=>{
     try{
       const raw=DATA.settings.viewBaseUrl.trim().replace(/\/+$/,"");
       const viewUrl= raw.endsWith("/view.html") ? raw : raw+"/view.html";
-      const link=viewUrl+"?d="+utf8ToB64url(JSON.stringify(buildPayload()));
+      // 对负载做 deflate 压缩，再把字节编码进链接：同样内容二维码更稀疏、可装更多（约 7 倍压缩）
+      const jsonStr=JSON.stringify(buildPayload());
+      const compressed=pako.deflate(new TextEncoder().encode(jsonStr));
+      const link=viewUrl+"?d="+bytesToB64url(compressed);
       qrContent=link; mode="link";
     }catch(e){ qrContent=text; mode="text"; }
   }
@@ -542,7 +551,7 @@ $("submitBtn").onclick=()=>{
   try{
     const url=tryGen(qrContent);
     if(mode==="link"){
-      paint(url,"微信/浏览器扫码，<b>直接在手机查看</b>本页注意事项（适合内容不太长的患者）。");
+      paint(url,"微信/浏览器扫码，<b>直接在手机查看</b>本页注意事项（已压缩，内容再多也能扫）。");
     }else{
       paint(url,"二维码含纯文本内容。<br>微信扫描后会显示「复制」按钮，点开即可看；内容较长时建议用「打印 / 导出图片」更稳妥。");
     }
@@ -559,7 +568,7 @@ $("submitBtn").onclick=()=>{
   }
   function fallbackFail(){
     $("qrArea").style.display="flex";
-    qrBox.innerHTML='<div class="qr-tip" style="color:var(--warn);max-width:230px">二维码容量已超限（约 500 个汉字）。请精简注意事项，或用「打印 / 导出图片 / Word」交给患者。</div>';
+    qrBox.innerHTML='<div class="qr-tip" style="color:var(--warn);max-width:230px">内容过长，二维码无法生成。请精简注意事项，或用「打印 / 导出图片 / Word」交给患者。</div>';
   }
   state.submitted=true;
   $("exportBar").style.display="flex";
