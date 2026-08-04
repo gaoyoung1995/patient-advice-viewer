@@ -507,16 +507,16 @@ function buildPayload(){
   auto.forEach(p=>{ if(state.checkedMap[p.id]!==false){ (byCat[p.category]=byCat[p.category]||[]).push(p.text); } });
   state.customItems.forEach(c=>{ if(c.checked){ (byCat["特殊注意事项"]=byCat["特殊注意事项"]||[]).push(c.text); } });
   const cats=CATEGORY_ORDER.filter(c=>byCat[c]&&byCat[c].length).concat(Object.keys(byCat).filter(c=>!CATEGORY_ORDER.includes(c)));
-  const groups=cats.map(cat=>({cat:cat, items:byCat[cat]}));
-  return {
-    clinic: DATA.settings.clinicName||"个性化注意事项",
-    patient: name, date: date,
-    groups: groups,
-    followUp: getFollowUpText(),
-    doctor: DATA.settings.doctorName||"",
-    footer: DATA.settings.footer||"",
-    generated: todayStr()
+  const groups=cats.map(cat=>({t:cat, i:byCat[cat]}));   // 短字段名，减少二维码字节
+  const o={
+    c: DATA.settings.clinicName||"个性化注意事项",
+    p: name, d: date,
+    g: groups,
+    f: getFollowUpText()
   };
+  if(DATA.settings.doctorName) o.dr=DATA.settings.doctorName;   // 空字段省略，进一步压缩
+  if(DATA.settings.footer) o.ft=DATA.settings.footer;
+  return o;
 }
 
 $("submitBtn").onclick=()=>{
@@ -538,9 +538,9 @@ $("submitBtn").onclick=()=>{
   }
   const qrBox=$("qrcode"); qrBox.innerHTML="";
   $("qrTip").style.color="";
-  function tryGen(content){          // M 失败自动降级到 L（容量更大）
-    try{ return generateQRDataUrl(content,480,"M"); }
-    catch(e1){ return generateQRDataUrl(content,480,"L"); }
+  function tryGen(content){          // 默认 L 级纠错：容量最大、模块数最少，每个方格更大更易扫
+    try{ return generateQRDataUrl(content,480,"L"); }
+    catch(e1){ return generateQRDataUrl(content,480,"M"); }   // L 仍超限则降级 M 再试
   }
   function paint(url, tipHtml){
     state.qrDataUrl=url;
@@ -628,7 +628,7 @@ function wordDoc(text, qrUrl){
 
 function generateQRDataUrl(text, size, ecLevel){
   if(typeof qrcode==="undefined") throw new Error("二维码组件未加载");
-  const qr=qrcode(0, ecLevel||"M");   // typeNumber 0 = 自动选择版本
+  const qr=qrcode(0, ecLevel||"L");   // typeNumber 0 = 自动选择版本；默认 L 级（模块最少、方格最大）
   qr.addData(text);
   qr.make();
   const count=qr.getModuleCount();
